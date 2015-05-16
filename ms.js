@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 
+var CREATE_TEMPLATE = __dirname + '/templates';
+
 var path = require('path'),
 	fs = require('fs-extra'),
 	shell = require('shelljs'),
 	program = require('commander'),
-	pkg = require(path.join(__dirname, 'package.json'));
+	pkg = require(path.join(__dirname, 'package.json')),
+	pwd = shell.pwd(),
+	templatePath = CREATE_TEMPLATE,
+	addPackages = 'underscore iron:router reactive-var accounts-password',
+	removePackages = 'autopublish insecure';
 
 program
 	.version(pkg.version);
@@ -13,49 +19,24 @@ program
 program
 	.command('create <name>')
 	.option('-f, --force', 'Create project (empty current folder).')
+	.option('-t, --template <templatePath>', 'User defined template as folder structure.')
 	.description('Create a new boilerplate Meteor project.')
 	.action(function(name, options) {
 		var createAndCopy = function() {
-			var versions = '',
-				pwd = shell.pwd();
+			var versions = '';
 
 			shell.exec('meteor create ' + name, function(err) {
-				// remove the default files
-				fs.removeSync(pwd + '/' + name + '/' + name + '.html');
-				fs.removeSync(pwd + '/' + name + '/' + name + '.css');
-				fs.removeSync(pwd + '/' + name + '/' + name + '.js');
-				console.log('\n- Removed meteor default files.');
+				// Tasks
+				taskRemoveDefaultFiles(name, options);
+				taskCopyTemplate(name, options);
 
-				// copy over our template
-				fs.copySync(__dirname + '/templates', pwd + '/' + name);
-				console.log('- Copied over meteor-setup templates.');
 
+				// cd to new folder
 				shell.cd(name);
 
-				// remove the autopublish and insecure
-				fs
-					.createReadStream('.meteor/versions', {encoding: 'utf8'})
-					.on('data', function(line) {
-						var lineTokens = line.split('\n');
-
-						lineTokens.forEach(function(line) {
-							hasAutopublish = /autopublish@/g.test(line);
-							hasInsecure = /insecure@/g.test(line);
-
-						    if (!hasAutopublish && !hasInsecure) {
-								versions += line + '\n';
-							}
-						});
-					})
-					.on('end', function() {
-						fs.writeFile('.meteor/versions', versions, 'utf8');
-						console.log('- Removed packages autopublish & insecure');
-
-						shell.exec('meteor add underscore iron:router reactive-var accounts-password', function(err) {
-							if (err) console.log(err);
-							console.log('- Added packages underscore, iron:router, reactive-var & accounts-password');
-						});
-					});
+				// more tasks
+				taskRemovePackages(removePackages);
+				taskAddPackages(addPackages);
 			});
 		};
 
@@ -80,3 +61,36 @@ program
 	});
 
 program.parse(process.argv);
+
+
+// tasks
+var taskRemoveDefaultFiles = function(name, options) {
+	process.stdout.write('\n - Removing Meteor default files....');
+	// remove the default files
+	fs.removeSync(pwd + '/' + name + '/' + name + '.html');
+	fs.removeSync(pwd + '/' + name + '/' + name + '.css');
+	fs.removeSync(pwd + '/' + name + '/' + name + '.js');
+	process.stdout.write('Done.');
+};
+
+var taskCopyTemplate = function(name, options) {
+	// with user provide template
+	if (options.template) {
+		templatePath = options.template;
+	}
+
+	process.stdout.write('\n - Coping over templates...');
+	// copy over our template
+	fs.copySync(templatePath, pwd + '/' + name);
+	process.stdout.write('Done.');
+};
+
+var taskAddPackages = function(packages) {
+	process.stdout.write('\n - Adding packages...');
+	shell.exec('meteor add ' + packages);
+};
+
+var taskRemovePackages = function(packages) {
+	process.stdout.write('\n - Removing packages...');
+	shell.exec('meteor remove ' + packages);
+};
