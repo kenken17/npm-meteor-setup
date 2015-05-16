@@ -2,7 +2,9 @@
 
 var TEMPLATE_START = __dirname + '/templates/start',
 	TEMPLATE_VIEW = __dirname + '/templates/view',
-	VIEW = 'client/views';
+	TEMPLATE_COLLECTION = __dirname + '/templates/collection',
+	VIEW = 'client/views',
+	COLLECTION = 'collections';
 
 var path = require('path'),
 	fs = require('fs-extra'),
@@ -40,7 +42,7 @@ var taskCopyStartTemplate = function(name, options) {
 var taskCopyViewTemplate = function(name, options) {
 	process.stdout.write('\n - Coping over view templates...');
 
-	if (fs.existsSync(VIEW + '/' + name + '.html') || fs.existsSync(VIEW + '/' + name + '.html')) {
+	if (fs.existsSync(VIEW + '/' + name + '.html') || fs.existsSync(VIEW + '/' + name + '.js')) {
 		console.log('view existed. Aborted.');
 	} else {
 		// copy over template
@@ -53,6 +55,26 @@ var taskCopyViewTemplate = function(name, options) {
 		// rename the template
 		fs.renameSync(VIEW + '/defaultView.js', VIEW + '/' + name + '.js');
 		fs.renameSync(VIEW + '/defaultView.html', VIEW + '/' + name + '.html');
+
+		process.stdout.write('Done.');
+	}
+};
+
+var taskCopyCollectionTemplate = function(name, options) {
+	process.stdout.write('\n - Coping over collection templates...');
+
+	if (fs.existsSync(COLLECTION + '/' + name + '.js')) {
+		console.log('collection existed. Aborted.');
+	} else {
+		// copy over template
+		fs.copySync(TEMPLATE_COLLECTION, COLLECTION);
+
+		// replace all string in default collection, first one should be CAPS
+		shell.sed('-i', /defaultCollection/, name.charAt(0).toUpperCase() + name.slice(1), COLLECTION + '/defaultCollection.js');
+		shell.sed('-i', /defaultCollection/g, name, COLLECTION + '/defaultCollection.js');
+
+		// rename the template
+		fs.renameSync(COLLECTION + '/defaultCollection.js', COLLECTION + '/' + name + '.js');
 
 		process.stdout.write('Done.');
 	}
@@ -131,6 +153,27 @@ program
 			shell.exit(1);
 		} else {
 			taskCopyViewTemplate(name, options);
+		}
+	});
+
+
+// Create a new collection
+program
+	.command('collection <name>')
+	.description('Create a new collection.')
+	.action(function(name, options) {
+		if (!shell.which('meteor')) {
+			shell.echo('Sorry dude. You need meteor to run this command.');
+			shell.exit(1);
+
+			return;
+		}
+
+		if (!fs.existsSync('.meteor')) {
+			shell.echo('Sorry dude. Please run this command in project root.');
+			shell.exit(1);
+		} else {
+			taskCopyCollectionTemplate(name, options);
 		}
 	});
 
