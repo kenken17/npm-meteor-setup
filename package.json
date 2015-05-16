@@ -1,0 +1,30 @@
+{
+  "name": "meteor-setup",
+  "version": "1.0.1",
+  "description": "Command line tool for creating basic Meteor app structure.",
+  "bin": {
+    "ms": "./ms.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kenken17/npm-meteor-setup.git"
+  },
+  "keywords": [
+    "meteor"
+  ],
+  "author": "kenken17 <kenken17@gmail.com>",
+  "license": "MIT",
+  "preferGlobal": true,
+  "bugs": {
+    "url": "https://github.com/kenken17/npm-meteor-setup/issues"
+  },
+  "homepage": "https://github.com/kenken17/npm-meteor-setup",
+  "dependencies": {
+    "commander": "^2.8.1",
+    "fs-extra": "^0.18.3",
+    "shelljs": "^0.4.0"
+  }
+}
