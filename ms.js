@@ -40,41 +40,47 @@ var taskCopyStartTemplate = function(name, options) {
 };
 
 var taskCopyViewTemplate = function(name, options) {
-	process.stdout.write('\n - Coping over view templates...');
+	var path = checkPath(options.path) || '',
+		targetPath = VIEW + path;
 
-	if (fs.existsSync(VIEW + '/' + name + '.html') || fs.existsSync(VIEW + '/' + name + '.js')) {
-		console.log('view existed. Aborted.');
+	if (fs.existsSync(targetPath + '/' + name + '.html') || fs.existsSync(targetPath + '/' + name + '.js')) {
+		console.log('View existed. Action aborted.');
 	} else {
+		process.stdout.write(' - Coping over view templates...');
+
 		// copy over template
-		fs.copySync(TEMPLATE_VIEW, VIEW);
+		fs.copySync(TEMPLATE_VIEW, targetPath);
 
 		// replace all string in default view
-		shell.sed('-i', /defaultView/g, name, VIEW + '/defaultView.js');
-		shell.sed('-i', /defaultView/g, name, VIEW + '/defaultView.html');
+		shell.sed('-i', /defaultView/g, name, targetPath + '/defaultView.js');
+		shell.sed('-i', /defaultView/g, name, targetPath + '/defaultView.html');
 
 		// rename the template
-		fs.renameSync(VIEW + '/defaultView.js', VIEW + '/' + name + '.js');
-		fs.renameSync(VIEW + '/defaultView.html', VIEW + '/' + name + '.html');
+		fs.renameSync(targetPath + '/defaultView.js', targetPath + '/' + name + '.js');
+		fs.renameSync(targetPath + '/defaultView.html', targetPath + '/' + name + '.html');
 
 		process.stdout.write('Done.');
 	}
 };
 
 var taskCopyCollectionTemplate = function(name, options) {
-	process.stdout.write('\n - Coping over collection templates...');
+	var path = checkPath(options.path) || '',
+		targetPath = COLLECTION + path;
 
-	if (fs.existsSync(COLLECTION + '/' + name + '.js')) {
-		console.log('collection existed. Aborted.');
+	if (fs.existsSync(targetPath + '/' + name + '.js')) {
+		console.log('Collection existed. Action aborted.');
 	} else {
+		process.stdout.write(' - Coping over collection templates...');
+
 		// copy over template
-		fs.copySync(TEMPLATE_COLLECTION, COLLECTION);
+		fs.copySync(TEMPLATE_COLLECTION, targetPath);
 
 		// replace all string in default collection, first one should be CAPS
-		shell.sed('-i', /defaultCollection/, name.charAt(0).toUpperCase() + name.slice(1), COLLECTION + '/defaultCollection.js');
-		shell.sed('-i', /defaultCollection/g, name, COLLECTION + '/defaultCollection.js');
+		shell.sed('-i', /defaultCollection/, name.charAt(0).toUpperCase() + name.slice(1), targetPath + '/defaultCollection.js');
+		shell.sed('-i', /defaultCollection/g, name, targetPath + '/defaultCollection.js');
 
 		// rename the template
-		fs.renameSync(COLLECTION + '/defaultCollection.js', COLLECTION + '/' + name + '.js');
+		fs.renameSync(targetPath + '/defaultCollection.js', targetPath + '/' + name + '.js');
 
 		process.stdout.write('Done.');
 	}
@@ -88,6 +94,22 @@ var taskAddPackages = function(packages) {
 var taskRemovePackages = function(packages) {
 	process.stdout.write('\n - Removing packages...');
 	shell.exec('meteor remove ' + packages);
+};
+
+var checkPath = function(path) {
+	if (path) {
+		// make sure path has no last '/'
+		if (path.slice(-1) === '/') {
+			path = path.slice(0, -1);
+		}
+
+		// make sure path have start '/'
+		if (path.slice(0) !== '/') {
+			path = '/' + path;
+		}
+	}
+
+	return path;
 };
 
 program.version(pkg.version);
@@ -161,6 +183,7 @@ program
 program
 	.command('collection <name>')
 	.description('Create a new collection.')
+	.option('-p, --path <path>', 'Path to copy the collection into.')
 	.action(function(name, options) {
 		if (!shell.which('meteor')) {
 			shell.echo('Sorry dude. You need meteor to run this command.');
