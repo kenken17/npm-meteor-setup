@@ -3,26 +3,31 @@
 var TEMPLATE_START = __dirname + '/templates/start',
 	TEMPLATE_VIEW = __dirname + '/templates/view',
 	TEMPLATE_COLLECTION = __dirname + '/templates/collection',
-	VIEW = 'client/views',
-	COLLECTION = 'collections';
+	VIEW = '/client/views',	// note: must match the default template/start structure
+	COLLECTION = '/collections';	// note: must match the default template/start structure
 
 var path = require('path'),
 	fs = require('fs-extra'),
 	shell = require('shelljs'),
 	program = require('commander'),
-	pkg = require(path.join(__dirname, 'package.json')),
-	pwd = shell.pwd(),
-	addPackages = 'underscore iron:router reactive-var accounts-password',
-	removePackages = 'autopublish insecure';
+	pkgDir = path.join(__dirname),
+	pkg = require(pkgDir + '/package.json'),
+	pwd = shell.pwd();
 
 // tasks
-var taskRemoveDefaultFiles = function(name, options) {
+var taskRemoveDefaultFiles = function(name) {
 	process.stdout.write('\n - Removing Meteor default files....');
 	// remove the default files
 	fs.removeSync(pwd + '/' + name + '/' + name + '.html');
 	fs.removeSync(pwd + '/' + name + '/' + name + '.css');
 	fs.removeSync(pwd + '/' + name + '/' + name + '.js');
 	process.stdout.write('Done.');
+};
+
+var taskCopyInitFile = function() {
+	process.stdout.write('- Copying over init file...');
+	// copy over init file
+	fs.copySync(pkgDir + '/ms.json', pwd + '/ms.json');
 };
 
 var taskCopyStartTemplate = function(name, options) {
@@ -33,20 +38,27 @@ var taskCopyStartTemplate = function(name, options) {
 		templateStart = options.template;
 	}
 
-	process.stdout.write('\n - Coping over startup templates...');
+	process.stdout.write('\n - Copying over startup templates...');
 	// copy over template
 	fs.copySync(templateStart, pwd + '/' + name);
 	process.stdout.write('Done.');
 };
 
 var taskCopyViewTemplate = function(name, options) {
-	var path = checkPath(options.path) || '',
-		targetPath = VIEW + path;
+	var userPath = checkPath(options.path),
+		init = require(path.join(pwd + '/ms.json')),
+		targetPath = VIEW + userPath;
+
+	// if init has a different path, use it
+	if (init && init.templates && init.templates.viewPath) {
+		targetPath = pwd + checkPath(init.templates.viewPath) + userPath;
+	}
 
 	if (fs.existsSync(targetPath + '/' + name + '.html') || fs.existsSync(targetPath + '/' + name + '.js')) {
-		console.log('View existed. Action aborted.');
+		shell.echo('View existed. Action aborted.');
+		shell.exit(1);
 	} else {
-		process.stdout.write(' - Coping over view templates...');
+		process.stdout.write(' - Copying over view templates...');
 
 		// copy over template
 		fs.copySync(TEMPLATE_VIEW, targetPath);
@@ -64,13 +76,20 @@ var taskCopyViewTemplate = function(name, options) {
 };
 
 var taskCopyCollectionTemplate = function(name, options) {
-	var path = checkPath(options.path) || '',
-		targetPath = COLLECTION + path;
+	var userPath = checkPath(options.path),
+		init = require(path.join(pwd + '/ms.json')),
+		targetPath = COLLECTION + userPath;
+
+	// if init has a different path, use it
+	if (init && init.templates && init.templates.collectionPath) {
+		targetPath = pwd + checkPath(init.templates.collectionPath) + userPath;
+	}
 
 	if (fs.existsSync(targetPath + '/' + name + '.js')) {
-		console.log('Collection existed. Action aborted.');
+		shell.echo('Collection existed. Action aborted.');
+		shell.exit(1);
 	} else {
-		process.stdout.write(' - Coping over collection templates...');
+		process.stdout.write(' - Copying over collection templates...');
 
 		// copy over template
 		fs.copySync(TEMPLATE_COLLECTION, targetPath);
@@ -86,14 +105,24 @@ var taskCopyCollectionTemplate = function(name, options) {
 	}
 };
 
-var taskAddPackages = function(packages) {
-	process.stdout.write('\n - Adding packages...');
-	shell.exec('meteor add ' + packages);
+var taskAddPackages = function() {
+	var init = require(path.join(pwd + '/ms.json'));
+
+	if (init && init.packages && init.packages.add) {
+		process.stdout.write('\n - Adding packages...');
+		// TODO: Check if packages existed
+		shell.exec('meteor add ' + init.packages.add.join(' '));
+	}
 };
 
-var taskRemovePackages = function(packages) {
-	process.stdout.write('\n - Removing packages...');
-	shell.exec('meteor remove ' + packages);
+var taskRemovePackages = function() {
+	var init = require(path.join(pwd + '/ms.json'));
+
+	if (init && init.packages && init.packages.remove) {
+		process.stdout.write('\n - Removing packages...');
+		// TODO: Check if packages existed
+		shell.exec('meteor remove ' + init.packages.remove.join(' '));
+	}
 };
 
 var checkPath = function(path) {
@@ -107,9 +136,33 @@ var checkPath = function(path) {
 		if (path.slice(0) !== '/') {
 			path = '/' + path;
 		}
+
+		return path;
 	}
 
-	return path;
+	return '';
+};
+
+var hasMeteor = function() {
+	if (!shell.which('meteor')) {
+		shell.echo('Sorry dude. You need meteor to run this command.');
+		shell.exit(1);
+
+		return false;
+	}
+
+	return true;
+};
+
+var isInRoot = function() {
+	if (!fs.existsSync('.meteor')) {
+		shell.echo('Sorry dude. Please run this command in project root.');
+		shell.exit(1);
+
+		return false;
+	}
+
+	return true;
 };
 
 program.version(pkg.version);
@@ -123,31 +176,21 @@ program
 	.action(function(name, options) {
 		var createAndCopy = function() {
 			shell.exec('meteor create ' + name, function(err) {
+
 				// Tasks
-				taskRemoveDefaultFiles(name, options);
+				taskRemoveDefaultFiles(name);
 				taskCopyStartTemplate(name, options);
-
-				// cd to new folder
-				shell.cd(name);
-
-				// more tasks
-				taskRemovePackages(removePackages);
-				taskAddPackages(addPackages);
 			});
 		};
 
-		if (!shell.which('meteor')) {
-			shell.echo('Sorry dude. You need meteor to run this command.');
-			shell.exit(1);
-
-			return;
-		}
+		if (!hasMeteor()) return;
 
 		if (!fs.existsSync(name)) {
 			createAndCopy();
 		} else {
 			if (!options.force) {
-				console.log('Directory/folder existed. Perform -f to force overwrite.');
+				shell.echo('Directory/folder existed. Perform -f to force overwrite.');
+				shell.exit(1);
 			} else {
 				fs.removeSync(name);
 
@@ -156,6 +199,36 @@ program
 		}
 	});
 
+// Init the project
+program
+	.command('init')
+	.description('Initialize a project.')
+	.action(function() {
+		if (!hasMeteor()) return;
+
+		if (!isInRoot()) return;
+
+		taskCopyInitFile();
+	});
+
+// Setup the project
+program
+	.command('setup')
+	.description('Setup a new project based on init file, if any.')
+	.action(function() {
+		if (!hasMeteor()) return;
+
+		if (!isInRoot()) return;
+
+		// check init file
+		if (!fs.existsSync(pwd + '/ms.json')) {
+			taskCopyInitFile();
+		}
+
+		// more tasks
+		taskRemovePackages();
+		taskAddPackages();
+	});
 
 // Create a new view
 program
@@ -163,19 +236,11 @@ program
 	.description('Create a new view.')
 	.option('-p, --path <path>', 'Path to copy the view into.')
 	.action(function(name, options) {
-		if (!shell.which('meteor')) {
-			shell.echo('Sorry dude. You need meteor to run this command.');
-			shell.exit(1);
+		if (!hasMeteor()) return;
 
-			return;
-		}
+		if (!isInRoot()) return;
 
-		if (!fs.existsSync('.meteor')) {
-			shell.echo('Sorry dude. Please run this command in project root.');
-			shell.exit(1);
-		} else {
-			taskCopyViewTemplate(name, options);
-		}
+		taskCopyViewTemplate(name, options);
 	});
 
 
@@ -185,19 +250,11 @@ program
 	.description('Create a new collection.')
 	.option('-p, --path <path>', 'Path to copy the collection into.')
 	.action(function(name, options) {
-		if (!shell.which('meteor')) {
-			shell.echo('Sorry dude. You need meteor to run this command.');
-			shell.exit(1);
+		if (!hasMeteor()) return;
 
-			return;
-		}
+		if (!isInRoot()) return;
 
-		if (!fs.existsSync('.meteor')) {
-			shell.echo('Sorry dude. Please run this command in project root.');
-			shell.exit(1);
-		} else {
-			taskCopyCollectionTemplate(name, options);
-		}
+		taskCopyCollectionTemplate(name, options);
 	});
 
 program.parse(process.argv);

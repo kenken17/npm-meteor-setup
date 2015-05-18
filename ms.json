@@ -1,0 +1,11 @@
+{
+	"templates": {
+		"viewPath": "/client/views",
+		"collectionPath": "/collections"
+	},
+
+	"packages": {
+		"remove": ["autopublish", "insecure"],
+		"add": ["underscore", "iron:router", "reactive-var", "accounts-password"]
+	}
+}
