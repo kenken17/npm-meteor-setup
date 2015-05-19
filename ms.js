@@ -3,6 +3,7 @@
 var TEMPLATE_START = __dirname + '/templates/start',
 	TEMPLATE_VIEW = __dirname + '/templates/view',
 	TEMPLATE_COLLECTION = __dirname + '/templates/collection',
+	TEMPLATE_EXTRA = __dirname + '/templates/extras',
 	VIEW = '/client/views',	// note: must match the default template/start structure
 	COLLECTION = '/collections';	// note: must match the default template/start structure
 
@@ -16,12 +17,12 @@ var path = require('path'),
 
 // tasks
 var taskRemoveDefaultFiles = function(name) {
-	process.stdout.write('\n - Removing Meteor default files....');
+	process.stdout.write(' - Removing Meteor default files....');
 	// remove the default files
 	fs.removeSync(pwd + '/' + name + '/' + name + '.html');
 	fs.removeSync(pwd + '/' + name + '/' + name + '.css');
 	fs.removeSync(pwd + '/' + name + '/' + name + '.js');
-	process.stdout.write('Done.');
+	process.stdout.write('Done.\n');
 };
 
 var taskCopyInitFile = function() {
@@ -38,21 +39,14 @@ var taskCopyStartTemplate = function(name, options) {
 		templateStart = options.template;
 	}
 
-	process.stdout.write('\n - Copying over startup templates...');
+	process.stdout.write(' - Copying over startup templates...');
 	// copy over template
 	fs.copySync(templateStart, pwd + '/' + name);
-	process.stdout.write('Done.');
+	process.stdout.write('Done.\n');
 };
 
 var taskCopyViewTemplate = function(name, options) {
-	var userPath = checkPath(options.path),
-		init = require(path.join(pwd + '/ms.json')),
-		targetPath = VIEW + userPath;
-
-	// if init has a different path, use it
-	if (init && init.templates && init.templates.viewPath) {
-		targetPath = pwd + checkPath(init.templates.viewPath) + userPath;
-	}
+	var targetPath = getViewTargetPath(options.path);
 
 	if (fs.existsSync(targetPath + '/' + name + '.html') || fs.existsSync(targetPath + '/' + name + '.js')) {
 		shell.echo('View existed. Action aborted.');
@@ -64,26 +58,19 @@ var taskCopyViewTemplate = function(name, options) {
 		fs.copySync(TEMPLATE_VIEW, targetPath);
 
 		// replace all string in default view
-		shell.sed('-i', /defaultView/g, name, targetPath + '/defaultView.js');
-		shell.sed('-i', /defaultView/g, name, targetPath + '/defaultView.html');
+		shell.sed('-i', /__DEFAULTVIEW__/g, name, targetPath + '/defaultView.js');
+		shell.sed('-i', /__DEFAULTVIEW__/g, name, targetPath + '/defaultView.html');
 
 		// rename the template
 		fs.renameSync(targetPath + '/defaultView.js', targetPath + '/' + name + '.js');
 		fs.renameSync(targetPath + '/defaultView.html', targetPath + '/' + name + '.html');
 
-		process.stdout.write('Done.');
+		process.stdout.write('Done.\n');
 	}
 };
 
 var taskCopyCollectionTemplate = function(name, options) {
-	var userPath = checkPath(options.path),
-		init = require(path.join(pwd + '/ms.json')),
-		targetPath = COLLECTION + userPath;
-
-	// if init has a different path, use it
-	if (init && init.templates && init.templates.collectionPath) {
-		targetPath = pwd + checkPath(init.templates.collectionPath) + userPath;
-	}
+	var targetPath = getCollectionTargetPath(options.path);
 
 	if (fs.existsSync(targetPath + '/' + name + '.js')) {
 		shell.echo('Collection existed. Action aborted.');
@@ -95,21 +82,35 @@ var taskCopyCollectionTemplate = function(name, options) {
 		fs.copySync(TEMPLATE_COLLECTION, targetPath);
 
 		// replace all string in default collection, first one should be CAPS
-		shell.sed('-i', /defaultCollection/, name.charAt(0).toUpperCase() + name.slice(1), targetPath + '/defaultCollection.js');
-		shell.sed('-i', /defaultCollection/g, name, targetPath + '/defaultCollection.js');
+		shell.sed('-i', /CAPS__DEFAULTCOLLECTION__/g, name.charAt(0).toUpperCase() + name.slice(1), targetPath + '/defaultCollection.js');
+		shell.sed('-i', /__DEFAULTCOLLECTION__/g, name, targetPath + '/defaultCollection.js');
 
 		// rename the template
 		fs.renameSync(targetPath + '/defaultCollection.js', targetPath + '/' + name + '.js');
 
-		process.stdout.write('Done.');
+		process.stdout.write('Done.\n');
 	}
+};
+
+var taskAddCollectionCRUDMethod = function(name, options) {
+	var targetPath = getCollectionTargetPath(options.path),
+		methods = shell.cat(path.join(TEMPLATE_EXTRA + '/CRUDMethods.js'));
+
+	process.stdout.write(' - Generating CRUD methods...');
+	fs.appendFileSync(targetPath + '/' + name + '.js', methods);
+
+	// replace all placeholder in collection
+	shell.sed('-i', /CAPS__DEFAULTCOLLECTION__/g, name.charAt(0).toUpperCase() + name.slice(1), targetPath + '/' + name + '.js');
+	shell.sed('-i', /__DEFAULTCOLLECTION__/g, name, targetPath + '/' + name + '.js');
+
+	process.stdout.write('Done.\n');
 };
 
 var taskAddPackages = function() {
 	var init = require(path.join(pwd + '/ms.json'));
 
 	if (init && init.packages && init.packages.add) {
-		process.stdout.write('\n - Adding packages...');
+		process.stdout.write(' - Adding packages...');
 		// TODO: Check if packages existed
 		shell.exec('meteor add ' + init.packages.add.join(' '));
 	}
@@ -119,7 +120,7 @@ var taskRemovePackages = function() {
 	var init = require(path.join(pwd + '/ms.json'));
 
 	if (init && init.packages && init.packages.remove) {
-		process.stdout.write('\n - Removing packages...');
+		process.stdout.write(' - Removing packages...');
 		// TODO: Check if packages existed
 		shell.exec('meteor remove ' + init.packages.remove.join(' '));
 	}
@@ -133,7 +134,7 @@ var checkPath = function(path) {
 		}
 
 		// make sure path have start '/'
-		if (path.slice(0) !== '/') {
+		if (path.slice(0, 1) !== '/') {
 			path = '/' + path;
 		}
 
@@ -163,6 +164,32 @@ var isInRoot = function() {
 	}
 
 	return true;
+};
+
+var getViewTargetPath = function(newPath) {
+	var userPath = checkPath(newPath),
+		init = require(path.join(pwd + '/ms.json')),
+		targetPath = VIEW + userPath;
+
+	// if init has a different path, use it
+	if (init && init.templates && init.templates.viewPath) {
+		targetPath = pwd + checkPath(init.templates.viewPath) + userPath;
+	}
+
+	return targetPath;
+};
+
+var getCollectionTargetPath = function(newPath) {
+	var userPath = checkPath(newPath),
+		init = require(path.join(pwd + '/ms.json')),
+		targetPath = COLLECTION + userPath;
+
+	// if init has a different path, use it
+	if (init && init.templates && init.templates.collectionPath) {
+		targetPath = pwd + checkPath(init.templates.collectionPath) + userPath;
+	}
+
+	return targetPath;
 };
 
 program.version(pkg.version);
@@ -249,12 +276,16 @@ program
 	.command('collection <name>')
 	.description('Create a new collection.')
 	.option('-p, --path <path>', 'Path to copy the collection into.')
+	.option('-m, --method', 'The CRUD methods for collection.')
 	.action(function(name, options) {
 		if (!hasMeteor()) return;
 
 		if (!isInRoot()) return;
 
 		taskCopyCollectionTemplate(name, options);
+		if (options && options.method) {
+			taskAddCollectionCRUDMethod(name, options);
+		}
 	});
 
 program.parse(process.argv);

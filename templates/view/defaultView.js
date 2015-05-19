@@ -1,19 +1,19 @@
-Template.defaultView.onCreated(function() {
+Template.__DEFAULTVIEW__.onCreated(function() {
     // Code here...
 });
 
-Template.defaultView.onRendered(function() {
+Template.__DEFAULTVIEW__.onRendered(function() {
     // Code here..
 });
 
-Template.defaultView.onDestroyed(function() {
+Template.__DEFAULTVIEW__.onDestroyed(function() {
     // Code here...
 });
 
-Template.defaultView.helpers({
+Template.__DEFAULTVIEW__.helpers({
 	// Code here...
 });
 
-Template.defaultView.events({
+Template.__DEFAULTVIEW__.events({
 	// Code here...
 });

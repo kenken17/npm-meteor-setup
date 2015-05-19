@@ -1,5 +1,2 @@
-defaultCollection = new Mongo.Collection('defaultCollection');
+CAPS__DEFAULTCOLLECTION__ = new Mongo.Collection('__DEFAULTCOLLECTION__');
 
-Meteor.methods({
-	// Code here...
-});
