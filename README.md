@@ -26,7 +26,7 @@ This will create a new Meteor project under the `<dir>` folder, with the default
 -t <templateDir>: the path to user defined folder.
 ```
 
-Default folder strcuture as below:
+Default folder structure as below:
 
 ```
 /
@@ -39,7 +39,7 @@ Default folder strcuture as below:
 │   └── route.js
 ├── server/ 		
 │   └── *
-├── collection/ 		
+├── collections/ 		
 │   └── *
 ├── public/ 		
 │   └── *

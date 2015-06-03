@@ -37,11 +37,18 @@ var taskCopyStartTemplate = function(name, options) {
 	// with user provide template
 	if (options.template) {
 		templateStart = options.template;
+	} else {
+		// create the empty folder
+		fs.mkdirsSync(pwd + '/' + name + '/collections');
+		fs.mkdirsSync(pwd + '/' + name + '/private');
+		fs.mkdirsSync(pwd + '/' + name + '/public');
+		fs.mkdirsSync(pwd + '/' + name + '/server');
 	}
 
 	process.stdout.write(' - Copying over startup templates...');
 	// copy over template
 	fs.copySync(templateStart, pwd + '/' + name);
+
 	process.stdout.write('Done.\n');
 };
 
