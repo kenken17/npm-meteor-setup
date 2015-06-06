@@ -1,7 +1,8 @@
 {
 	"templates": {
 		"viewPath": "/client/views",
-		"collectionPath": "/collections"
+		"collectionPath": "/collections",
+		"routeFile": "/lib/route.js"
 	},
 
 	"packages": {

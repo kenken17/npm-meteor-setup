@@ -3,9 +3,7 @@
 var TEMPLATE_START = __dirname + '/templates/start',
 	TEMPLATE_VIEW = __dirname + '/templates/view',
 	TEMPLATE_COLLECTION = __dirname + '/templates/collection',
-	TEMPLATE_EXTRA = __dirname + '/templates/extras',
-	VIEW = '/client/views',	// note: must match the default template/start structure
-	COLLECTION = '/collections';	// note: must match the default template/start structure
+	TEMPLATE_EXTRA = __dirname + '/templates/extras';
 
 var path = require('path'),
 	fs = require('fs-extra'),
@@ -76,10 +74,26 @@ var taskCopyViewTemplate = function(name, options) {
 	}
 };
 
-var taskCopyCollectionTemplate = function(name, options) {
-	var targetPath = getCollectionTargetPath(options.path);
+var taskAddViewRoute = function(name, options) {
+	var targetPath = checkPath(options.path),
+		targetRouteFile = getRouteTargetFile(),
+		route = shell.cat(path.join(TEMPLATE_EXTRA + '/viewRoute.js'));
 
-	if (fs.existsSync(targetPath + '/' + name + '.js')) {
+	process.stdout.write(' - Generating route...');
+	fs.appendFileSync(targetRouteFile, route);
+
+	// replace all placeholder in route
+	shell.sed('-i', /__DEFAULTVIEW_PATH__/g, targetPath, targetRouteFile);
+	shell.sed('-i', /__DEFAULTVIEW__/g, name, targetRouteFile);
+
+	process.stdout.write('Done.\n');
+};
+
+var taskCopyCollectionTemplate = function(name, options) {
+	var targetPath = getCollectionTargetPath(options.path),
+		finalPath = targetPath + '/' + name + '.js';
+
+	if (fs.existsSync(finalPath)) {
 		shell.echo('Collection existed. Action aborted.');
 		shell.exit(1);
 	} else {
@@ -93,7 +107,7 @@ var taskCopyCollectionTemplate = function(name, options) {
 		shell.sed('-i', /__DEFAULTCOLLECTION__/g, name, targetPath + '/defaultCollection.js');
 
 		// rename the template
-		fs.renameSync(targetPath + '/defaultCollection.js', targetPath + '/' + name + '.js');
+		fs.renameSync(targetPath + '/defaultCollection.js', finalPath);
 
 		process.stdout.write('Done.\n');
 	}
@@ -101,14 +115,15 @@ var taskCopyCollectionTemplate = function(name, options) {
 
 var taskAddCollectionCRUDMethod = function(name, options) {
 	var targetPath = getCollectionTargetPath(options.path),
-		methods = shell.cat(path.join(TEMPLATE_EXTRA + '/CRUDMethods.js'));
+		methods = shell.cat(path.join(TEMPLATE_EXTRA + '/CRUDMethods.js')),
+		finalPath = targetPath + '/' + name + '.js';
 
 	process.stdout.write(' - Generating CRUD methods...');
-	fs.appendFileSync(targetPath + '/' + name + '.js', methods);
+	fs.appendFileSync(finalPath, methods);
 
 	// replace all placeholder in collection
-	shell.sed('-i', /CAPS__DEFAULTCOLLECTION__/g, name.charAt(0).toUpperCase() + name.slice(1), targetPath + '/' + name + '.js');
-	shell.sed('-i', /__DEFAULTCOLLECTION__/g, name, targetPath + '/' + name + '.js');
+	shell.sed('-i', /CAPS__DEFAULTCOLLECTION__/g, name.charAt(0).toUpperCase() + name.slice(1), finalPath);
+	shell.sed('-i', /__DEFAULTCOLLECTION__/g, name, finalPath);
 
 	process.stdout.write('Done.\n');
 };
@@ -175,28 +190,22 @@ var isInRoot = function() {
 
 var getViewTargetPath = function(newPath) {
 	var userPath = checkPath(newPath),
-		init = require(path.join(pwd + '/ms.json')),
-		targetPath = VIEW + userPath;
+		init = require(path.join(pwd + '/ms.json'));
 
-	// if init has a different path, use it
-	if (init && init.templates && init.templates.viewPath) {
-		targetPath = pwd + checkPath(init.templates.viewPath) + userPath;
-	}
-
-	return targetPath;
+	return pwd + checkPath(init.templates.viewPath) + userPath;
 };
 
 var getCollectionTargetPath = function(newPath) {
 	var userPath = checkPath(newPath),
-		init = require(path.join(pwd + '/ms.json')),
-		targetPath = COLLECTION + userPath;
+		init = require(path.join(pwd + '/ms.json'));
 
-	// if init has a different path, use it
-	if (init && init.templates && init.templates.collectionPath) {
-		targetPath = pwd + checkPath(init.templates.collectionPath) + userPath;
-	}
+	return pwd + checkPath(init.templates.collectionPath) + userPath;
+};
 
-	return targetPath;
+var getRouteTargetFile = function() {
+	var init = require(path.join(pwd + '/ms.json'));
+
+	return pwd + checkPath(init.templates.routeFile);
 };
 
 program.version(pkg.version);
@@ -269,12 +278,22 @@ program
 	.command('view <name>')
 	.description('Create a new view.')
 	.option('-p, --path <path>', 'Path to copy the view into.')
+	.option('-r, --route', 'Generate a route for this view.')
 	.action(function(name, options) {
 		if (!hasMeteor()) return;
 
 		if (!isInRoot()) return;
 
+		// check init file
+		if (!fs.existsSync(pwd + '/ms.json')) {
+			taskCopyInitFile();
+		}
+
 		taskCopyViewTemplate(name, options);
+
+		if (options && options.route) {
+			taskAddViewRoute(name, options);
+		}
 	});
 
 
@@ -289,7 +308,13 @@ program
 
 		if (!isInRoot()) return;
 
+		// check init file
+		if (!fs.existsSync(pwd + '/ms.json')) {
+			taskCopyInitFile();
+		}
+
 		taskCopyCollectionTemplate(name, options);
+
 		if (options && options.method) {
 			taskAddCollectionCRUDMethod(name, options);
 		}
