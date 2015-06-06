@@ -78,7 +78,7 @@ $ ms setup
 ```
 
 ###view
-Create a new view.
+Create a new view. If `ms.json` is missing, it will create one before this command.
 
 ```bash
 $ ms view <name>
@@ -88,10 +88,11 @@ $ ms view <name>
 
 ```
 -p <path>: the path for collection to put into.
+-r: also add a route for this view.
 ```
 
 ###collection
-Create a new collection.
+Create a new collection. If `ms.json` is missing, it will create one before this command.
 
 ```bash
 $ ms collection <name>
