@@ -1,4 +1,5 @@
-#!/usr/bin/env node
+#!/bin/sh
+':' //; exec "$(command -v nodejs || command -v node)" "$0" "$@"
 
 var TEMPLATE_START = __dirname + '/templates/start',
 	TEMPLATE_VIEW = __dirname + '/templates/view',
